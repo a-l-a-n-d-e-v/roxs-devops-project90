@@ -76,12 +76,36 @@ session_count = 0
 def get_redis():
     if not hasattr(g, 'redis'):
         try:
-            g.redis = Redis(host=REDIS, db=0, socket_timeout=5)
-            # Test connection
-            g.redis.ping()
-            redis_connection_status.set(1)
+            redis_host = os.getenv('REDIS_HOST', 'redis')
+            redis_port = int(os.getenv('REDIS_PORT', '6379'))
+            redis_password = os.getenv('REDIS_PASSWORD', 'secretpassword')
+            
+            app.logger.info(f"Connecting to Redis at {redis_host}:{redis_port} with password: {'*' * len(redis_password) if redis_password else 'none'}")
+            
+            g.redis = Redis(
+                host=redis_host,
+                port=redis_port,
+                db=0,
+                password=redis_password if redis_password else None,
+                socket_timeout=5,
+                socket_connect_timeout=5,
+                decode_responses=True,
+                retry_on_timeout=True,
+                health_check_interval=30
+            )
+            
+            # Test connection with explicit error handling
+            try:
+                ping_result = g.redis.ping()
+                app.logger.info(f"Redis ping successful: {ping_result}")
+                redis_connection_status.set(1)
+            except Exception as ping_error:
+                app.logger.error(f"Redis ping failed: {ping_error}")
+                redis_connection_status.set(0)
+                raise
+                
         except Exception as e:
-            app.logger.error(f"Redis connection failed: {e}")
+            app.logger.error(f"Redis connection initialization failed: {str(e)}", exc_info=True)
             redis_connection_status.set(0)
             raise
     return g.redis
