@@ -25,10 +25,20 @@ const DB_CONFIG = {
 const REDIS_CONFIG = {
   host: null, // Se establecerá dinámicamente
   port: 6379,
+  password: process.env.REDIS_PASSWORD || 'secretpassword',
   connectTimeout: 10000,
   lazyConnect: true,
   retryDelayOnFailover: 100,
   maxRetriesPerRequest: 3,
+  retryStrategy: (times) => {
+    const delay = Math.min(times * 1000, 5000);
+    console.log(`Reintentando conexión a Redis en ${delay}ms...`);
+    return delay;
+  },
+  reconnectOnError: (err) => {
+    console.log('Error de reconexión de Redis:', err.message);
+    return true; // Reintentar la conexión
+  }
 };
 
 async function openDbConnection(connectionOptions) {
